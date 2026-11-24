@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Silver Layer Documentation</title>
+    <style>
+        @page {
+            margin: 1in;
+            size: A4;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 20px 40px 20px 60px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2.2em;
+            margin-top: 0;
+        }
+        
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+            page-break-after: avoid;
+        }
+        
+        h3 {
+            color: #2c3e50;
+            font-size: 1.3em;
+            margin-top: 1.5em;
+            page-break-after: avoid;
+        }
+        
+        h4 {
+            color: #7f8c8d;
+            font-size: 1.1em;
+            margin-top: 1.2em;
+        }
+        
+        code {
+            background-color: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            line-height: 1.4;
+            page-break-inside: avoid;
+            margin: 1em 0;
+        }
+        
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        
+        ul, ol {
+            padding-left: 20px;
+        }
+        
+        li {
+            margin-bottom: 5px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1em 0;
+            font-size: 0.9em;
+            page-break-inside: avoid;
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            vertical-align: top;
+        }
+        
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        
+        .emoji {
+            font-size: 1.2em;
+        }
+        
+        .section-break {
+            page-break-before: always;
+        }
+        
+        .no-break {
+            page-break-inside: avoid;
+        }
+        
+        hr {
+            border: none;
+            border-top: 1px solid #eee;
+            margin: 2em 0;
+        }
+        
+        @media print {
+            body {
+                font-size: 11pt;
+                line-height: 1.4;
+                padding: 0.5in 0.5in 0.5in 0.8in;
+            }
+            
+            h1 {
+                font-size: 18pt;
+            }
+            
+            h2 {
+                font-size: 14pt;
+            }
+            
+            h3 {
+                font-size: 12pt;
+            }
+            
+            pre {
+                font-size: 9pt;
+            }
+            
+            table {
+                font-size: 9pt;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<h1><span class="emoji">🧱</span> Silver Layer Documentation</h1>
+
+<p>This document outlines the creation of <strong>Silver Layer</strong> dimension tables from the <code>tb_raw_source</code> Bronze table for downstream analytics and modeling.</p>
+
+<hr>
+
+<h2><span class="emoji">⚙️</span> Overview</h2>
+
+<ul>
+<li><strong>Source</strong>: <code>punit_dbx.bronze.tb_raw_source</code></li>
+<li><strong>Target Schema</strong>: <code>punit_dbx.silver</code></li>
+<li><strong>Purpose</strong>: Normalize raw data into clean, deduplicated, hashed dimension tables</li>
+<li><strong>Hashing</strong>: Using <code>md5(lower(trim(col)))</code> & <code>hash(lower(trim(col)))</code> for consistent surrogate keys</li>
+
+<hr>
+
+<h2><span class="emoji">📋</span> Dimension Tables</h2>
+
+<div class="no-break">
+<h3>1. <code>dim_country</code></h3>
+
+<pre><code>CREATE OR REPLACE TABLE punit_dbx.silver.dim_country AS   
+SELECT 
+    md5(lower(trim(country))) AS country_id,
+    country
+FROM (
+    SELECT DISTINCT country
+    FROM punit_dbx.bronze.tb_raw_source
+) AS distinct_country;</code></pre>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>2. <code>dim_state</code></h3>
+
+<pre><code>CREATE OR REPLACE TABLE punit_dbx.silver.dim_state AS   
+SELECT 
+    md5(lower(trim(concat_ws('|', country, state)))) AS state_id,
+    md5(lower(trim(country))) AS country_id,
+    state,
+    country
+FROM (
+    SELECT DISTINCT state, country
+    FROM punit_dbx.bronze.tb_raw_source
+) AS distinct_state;</code></pre>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>3. <code>dim_city</code></h3>
+
+<pre><code>CREATE OR REPLACE TABLE punit_dbx.silver.dim_city AS  
+SELECT 
+    md5(lower(trim(concat_ws('|', country, state, city)))) AS city_id,
+    md5(lower(trim(concat_ws('|', country, state)))) AS state_id,
+    md5(lower(trim(country))) AS country_id,
+    city,
+    state,
+    country
+FROM (
+    SELECT DISTINCT city, state, country
+    FROM punit_dbx.bronze.tb_raw_source
+) AS distinct_city;</code></pre>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>4. <code>dim_location</code></h3>
+
+<pre><code>CREATE OR REPLACE TEMP VIEW tmp_vw_location AS 
+SELECT DISTINCT
+    address,
+    zip_code,
+    city,
+    state,
+    country,
+    md5(lower(trim(concat_ws('|', country, state, city)))) AS city_id,
+    md5(lower(trim(concat_ws('|', country, state)))) AS state_id,
+    md5(lower(trim(country))) AS country_id
+FROM punit_dbx.bronze.tb_raw_source;
+
+CREATE OR REPLACE TABLE punit_dbx.silver.dim_location AS 
+SELECT DISTINCT
+    md5(lower(trim(concat_ws('|', address, zip_code, city, state, country)))) AS location_id,
+    address,
+    zip_code,
+    city_id,
+    state_id,
+    country_id
+FROM tmp_vw_location;</code></pre>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>5. <code>dim_order_status</code></h3>
+
+<pre><code>CREATE OR REPLACE TABLE punit_dbx.silver.dim_order_status AS   
+SELECT 
+    md5(lower(trim(order_status))) AS order_status_id,
+    order_status
+FROM (
+    SELECT DISTINCT order_status
+    FROM punit_dbx.bronze.tb_raw_source
+) AS distinct_status;</code></pre>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>6. <code>dim_payment_method</code></h3>
+
+<pre><code>CREATE OR REPLACE TABLE punit_dbx.silver.dim_payment_method AS   
+SELECT 
+    md5(lower(trim(payment_method))) AS payment_method_id,
+    payment_method
+FROM (
+    SELECT DISTINCT payment_method
+    FROM punit_dbx.bronze.tb_raw_source
+);</code></pre>
+</div>
+
+<div class="section-break"></div>
+
+<div class="no-break">
+<h3>7. <code>dim_date</code></h3>
+
+<pre><code>CREATE OR REPLACE TABLE punit_dbx.silver.dim_date (
+    date_id       BIGINT,
+    date          DATE,
+    month         INT,
+    year          INT,
+    day_of_year   INT,
+    day_of_month  INT,
+    day_of_week   INT,
+    day_name      STRING,
+    quarter       INT
+);
+
+INSERT INTO punit_dbx.silver.dim_date
+SELECT
+    YEAR(d) * 10000 + DAYOFYEAR(d) AS date_id,
+    d AS date,
+    MONTH(d) AS month,
+    YEAR(d) AS year,
+    DAYOFYEAR(d) AS day_of_year,
+    DAY(d) AS day_of_month,
+    CASE WHEN DAYOFWEEK(d) = 1 THEN 7 ELSE DAYOFWEEK(d) - 1 END AS day_of_week,
+    DATE_FORMAT(d, 'EEEE') AS day_name,
+    QUARTER(d) AS quarter
+FROM (
+    SELECT EXPLODE(SEQUENCE(DATE('2024-01-01'), DATE('2026-12-31'), INTERVAL 1 DAY)) AS d
+);</code></pre>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>8. <code>dim_product_brand</code></h3>
+
+<pre><code>CREATE OR REPLACE TABLE punit_dbx.silver.dim_product_brand AS   
+SELECT 
+    md5(lower(trim(product_brand))) AS product_brand_id,
+    product_brand
+FROM (
+    SELECT DISTINCT product_brand
+    FROM punit_dbx.bronze.tb_raw_source
+);</code></pre>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>9. <code>dim_product_category</code></h3>
+
+<pre><code>CREATE OR REPLACE TABLE punit_dbx.silver.dim_product_category AS   
+SELECT 
+    md5(lower(trim(product_category))) AS product_category_id,
+    product_category
+FROM (
+    SELECT DISTINCT product_category
+    FROM punit_dbx.bronze.tb_raw_source
+);</code></pre>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>10. <code>dim_customer</code></h3>
+
+<p>Handles inconsistencies in <code>gender</code> per <code>customer_id</code>.</p>
+
+<pre><code>-- Customers with multiple genders (resolve by majority)
+WITH multi_gender_customers AS (
+    SELECT customer_id
+    FROM punit_dbx.bronze.tb_raw_source
+    GROUP BY customer_id
+    HAVING COUNT(DISTINCT gender) > 1
+),
+resolved_gender AS (
+    SELECT customer_id, FIRST(gender) AS gender
+    FROM (
+        SELECT customer_id, gender, COUNT(*) AS cnt
+        FROM punit_dbx.bronze.tb_raw_source
+        WHERE customer_id IN (SELECT customer_id FROM multi_gender_customers)
+        GROUP BY customer_id, gender
+        ORDER BY cnt DESC
+    ) GROUP BY customer_id
+),
+final_customer_data AS (
+    SELECT DISTINCT customer_id, gender, email, birth_date
+    FROM punit_dbx.bronze.tb_raw_source
+    WHERE customer_id NOT IN (SELECT customer_id FROM multi_gender_customers)
+    UNION ALL
+    SELECT customer_id, gender, email, birth_date
+    FROM resolved_gender
+    JOIN punit_dbx.bronze.tb_raw_source USING (customer_id, gender)
+)
+CREATE OR REPLACE TABLE punit_dbx.silver.dim_customer AS 
+SELECT DISTINCT * FROM final_customer_data;</code></pre>
+</div>
+
+<div class="section-break"></div>
+
+<div class="no-break">
+<h3>11. <code>dim_customer_segment</code> (SCD Type 2)</h3>
+
+<h4>Multi-Segment Customers</h4>
+
+<pre><code>CREATE OR REPLACE TEMP VIEW customer_multi_segment_scd AS
+WITH distinct_data AS (
+    SELECT DISTINCT customer_id, customer_segment, datetimestamp
+    FROM punit_dbx.bronze.tb_raw_source
+),
+multi_seg AS (
+    SELECT customer_id FROM distinct_data GROUP BY customer_id HAVING COUNT(DISTINCT customer_segment) > 1
+),
+seg_with_bounds AS (
+    SELECT *,
+        LAG(customer_segment) OVER (PARTITION BY customer_id ORDER BY datetimestamp) AS prev_seg,
+        LEAD(datetimestamp) OVER (PARTITION BY customer_id ORDER BY datetimestamp) AS next_ts
+    FROM distinct_data
+    WHERE customer_id IN (SELECT customer_id FROM multi_seg)
+),
+start_periods AS (
+    SELECT customer_id, customer_segment, datetimestamp AS start_date,
+           LEAD(datetimestamp) OVER (PARTITION BY customer_id ORDER BY datetimestamp) AS end_date
+    FROM seg_with_bounds
+    WHERE prev_seg IS NULL OR customer_segment != prev_seg
+)
+SELECT 
+    customer_id,
+    customer_segment,
+    start_date,
+    end_date,
+    CASE WHEN end_date IS NULL THEN TRUE ELSE FALSE END AS is_active
+FROM start_periods;</code></pre>
+
+<h4>Single-Segment Customers</h4>
+
+<pre><code>CREATE OR REPLACE TEMP VIEW customer_single_segment_scd AS
+WITH multi_seg AS (
+    SELECT customer_id FROM punit_dbx.bronze.tb_raw_source GROUP BY customer_id HAVING COUNT(DISTINCT customer_segment) > 1
+),
+ranked AS (
+    SELECT DISTINCT customer_id, customer_segment, datetimestamp,
+           RANK() OVER (PARTITION BY customer_id ORDER BY datetimestamp) AS rnk
+    FROM punit_dbx.bronze.tb_raw_source
+    WHERE customer_id NOT IN (SELECT customer_id FROM multi_seg)
+)
+SELECT 
+    customer_id,
+    customer_segment,
+    datetimestamp AS start_date,
+    NULL AS end_date,
+    TRUE AS is_active
+FROM ranked
+WHERE rnk = 1;</code></pre>
+
+<h4>Final Segment Table</h4>
+
+<pre><code>CREATE OR REPLACE TABLE punit_dbx.silver.dim_customer_segment AS
+SELECT 
+    *,
+    md5(lower(trim(customer_segment))) AS customer_segment_id
+FROM (
+    SELECT * FROM customer_multi_segment_scd
+    UNION ALL
+    SELECT * FROM customer_single_segment_scd
+);</code></pre>
+</div>
+
+<div class="section-break"></div>
+
+<div class="no-break">
+<h3>12. <code>dim_product</code> (SCD for Price Tracking)</h3>
+
+<p>Tracks changes in product pricing over time using SCD logic.</p>
+
+<pre><code>-- Step 1: Track price changes per product
+CREATE OR REPLACE TEMP VIEW product_scd AS
+WITH cte AS (
+  SELECT 
+    DISTINCT product_id, amount, datetimestamp, product_brand, product_category,
+    LAG(amount) OVER (PARTITION BY product_id ORDER BY datetimestamp) AS lag_amount
+  FROM punit_dbx.bronze.tb_raw_source
+),
+cte2 AS (
+  SELECT *,
+    CASE WHEN lag_amount IS NULL OR amount != lag_amount THEN datetimestamp ELSE NULL END AS start_date
+  FROM cte
+),
+cte3 AS (
+  SELECT *,
+    LEAD(start_date) OVER (PARTITION BY product_id ORDER BY start_date) AS end_date
+  FROM cte2
+  WHERE start_date IS NOT NULL
+),
+cte4 AS (
+  SELECT 
+    product_id, amount, start_date, product_brand, product_category,
+    end_date,
+    CASE WHEN end_date IS NULL THEN TRUE ELSE FALSE END AS is_active
+  FROM cte3
+)
+SELECT * FROM cte4;</code></pre>
+
+<pre><code>-- Step 2: Get most common product name per product_id
+CREATE OR REPLACE TEMP VIEW product_list AS
+WITH ranked_cte AS (
+  SELECT product_id, product_type, COUNT(*) AS cnt,
+         ROW_NUMBER() OVER (PARTITION BY product_id ORDER BY COUNT(*) DESC) AS rn
+  FROM punit_dbx.bronze.tb_raw_source
+  GROUP BY product_id, product_type
+)
+SELECT product_id, product_type
+FROM ranked_cte
+WHERE rn = 1;</code></pre>
+
+<pre><code>-- Step 3: Merge name + hash foreign keys
+CREATE OR REPLACE TEMP VIEW product_list_df AS
+SELECT 
+  ps.*, 
+  pl.product_type AS product_name,
+  hash(lower(ps.product_category)) AS product_category_id,
+  hash(lower(ps.product_brand)) AS product_brand_id
+FROM product_list pl
+JOIN product_scd ps ON pl.product_id = ps.product_id;</code></pre>
+
+<pre><code>-- Step 4: Save to silver layer
+CREATE OR REPLACE TABLE punit_dbx.silver.dim_product AS
+SELECT 
+  product_id, 
+  product_name, 
+  product_category_id,
+  product_brand_id,
+  amount, 
+  start_date, 
+  end_date, 
+  is_active
+FROM product_list_df;</code></pre>
+</div>
+
+<div class="section-break"></div>
+
+<div class="no-break">
+<h3>13. <code>dim_feedback</code> (SCD for Feedback + Rating)</h3>
+
+<p>Tracks changes in product feedback and ratings per customer.</p>
+
+<pre><code>-- Step 1: SCD logic for feedback/rating
+CREATE OR REPLACE TEMP VIEW feedback_scd AS
+WITH cte AS (
+  SELECT DISTINCT
+    product_id, customer_id, feedback, rating, datetimestamp,
+    LAG(feedback) OVER (PARTITION BY product_id ORDER BY datetimestamp) AS lag_feed,
+    LAG(rating) OVER (PARTITION BY product_id ORDER BY datetimestamp) AS lag_rating
+  FROM punit_dbx.bronze.tb_raw_source
+),
+cte2 AS (
+  SELECT *,
+    CASE 
+      WHEN lag_feed IS NULL AND lag_rating IS NULL THEN datetimestamp
+      WHEN lag_feed != feedback OR lag_rating != rating THEN datetimestamp
+      ELSE NULL
+    END AS start_date
+  FROM cte
+),
+cte3 AS (
+  SELECT *,
+    LEAD(start_date) OVER (PARTITION BY product_id ORDER BY start_date) AS end_date
+  FROM cte2
+),
+cte4 AS (
+  SELECT *,
+    CASE WHEN end_date IS NULL THEN TRUE ELSE FALSE END AS is_active
+  FROM cte3
+)
+SELECT * FROM cte4;</code></pre>
+
+<pre><code>-- Step 2: Generate unique feedback_id
+CREATE OR REPLACE TEMP VIEW feedback_scd_unique AS
+WITH cte AS (
+  SELECT 
+    md5(concat(
+      coalesce(product_id, ''), coalesce(customer_id, ''),
+      coalesce(datetimestamp, ''), coalesce(feedback, ''),
+      coalesce(try_cast(rating AS STRING), '')
+    )) AS feedback_id,
+    product_id, customer_id, feedback, rating, start_date, end_date, is_active
+  FROM feedback_scd
+)
+SELECT * FROM cte;</code></pre>
+
+<pre><code>-- Step 3: Save to silver layer
+CREATE OR REPLACE TABLE punit_dbx.silver.dim_feedback AS 
+SELECT DISTINCT * FROM feedback_scd_unique;</code></pre>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>14. <code>dim_shipping</code></h3>
+
+<pre><code>CREATE OR REPLACE TABLE punit_dbx.silver.dim_shipping AS   
+SELECT 
+   hash(lower(shipping_method)) AS shipping_method_id,
+   shipping_method
+FROM (
+    SELECT DISTINCT shipping_method
+    FROM punit_dbx.bronze.tb_raw_source
+);</code></pre>
+</div>
+
+<div class="section-break"></div>
+
+<h2><span class="emoji">📦</span> Fact Table</h2>
+
+<div class="no-break">
+<h3>15. <code>fact_orders_details</code></h3>
+
+<p>Combines keys and measures for analytics.</p>
+
+<pre><code>-- Step 1: Create clean base view
+CREATE OR REPLACE VIEW tmp_raw_source AS 
+SELECT DISTINCT * FROM punit_dbx.bronze.tb_raw_source;</code></pre>
+
+<pre><code>-- Step 2: Construct fact with surrogate keys
+CREATE OR REPLACE TEMP VIEW tmp_orders_details AS
+SELECT  
+  transaction_id,
+  customer_id,
+  product_id,
+  datetimestamp,
+  phone,
+  quantity,
+  birth_date,
+  hash(lower(product_brand)) AS product_brand_id,
+  hash(lower(product_category)) AS product_category_id,
+  hash(lower(shipping_method)) AS shipping_method_id,
+  md5(lower(trim(concat_ws('|', address, zip_code, city, state, country)))) AS location_id,
+  hash(lower(payment_method)) AS payment_method_id,
+  hash(lower(order_status)) AS order_status_id,
+  hash(lower(customer_segment)) AS customer_segment_id,
+  md5(concat(
+    coalesce(product_id, ''),
+    coalesce(customer_id, ''),
+    coalesce(datetimestamp, ''),
+    coalesce(feedback, ''),
+    coalesce(try_cast(rating AS STRING), '')
+  )) AS feedback_id,
+  YEAR(datetimestamp) * 10000 + DAYOFYEAR(datetimestamp) AS date_id
+FROM tmp_raw_source;</code></pre>
+
+<pre><code>-- Step 3: Save to Silver Layer
+CREATE OR REPLACE TABLE punit_dbx.silver.fact_orders_details AS
+SELECT * FROM tmp_orders_details;</code></pre>
+</div>
+
+<div class="section-break"></div>
+
+<h2><span class="emoji">✅</span> Summary</h2>
+
+<table>
+<thead>
+<tr>
+<th>Table Name</th>
+<th>Description</th>
+<th>SCD Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dim_country</code></td>
+<td>Unique list of countries</td>
+<td>-</td>
+<td>Uses <code>hash(lower(country))</code> as surrogate key</td>
+</tr>
+<tr>
+<td><code>dim_state</code></td>
+<td>Unique list of states with country linkage</td>
+<td>-</td>
+<td>Includes <code>state_id</code> and <code>country_id</code> from hashed lowercased values</td>
+</tr>
+<tr>
+<td><code>dim_city</code></td>
+<td>Unique list of cities linked to state & country</td>
+<td>-</td>
+<td><code>city_id</code>, <code>state_id</code>, and <code>country_id</code> from hash values</td>
+</tr>
+<tr>
+<td><code>dim_location</code></td>
+<td>Unique addresses with generated <code>location_id</code></td>
+<td>-</td>
+<td>Combines address components and hashes with <code>MD5()</code></td>
+</tr>
+<tr>
+<td><code>dim_order_status</code></td>
+<td>Distinct order statuses</td>
+<td>-</td>
+<td>Uses <code>hash(lower(order_status))</code></td>
+</tr>
+<tr>
+<td><code>dim_payment_method</code></td>
+<td>Distinct payment methods</td>
+<td>-</td>
+<td>Uses <code>hash(lower(payment_method))</code></td>
+</tr>
+<tr>
+<td><code>dim_date</code></td>
+<td>Calendar table with day/month/year/quarter fields</td>
+<td>-</td>
+<td>Covers 2024–2026 using <code>explode(sequence(...))</code></td>
+</tr>
+<tr>
+<td><code>dim_product_brand</code></td>
+<td>Distinct product brands</td>
+<td>-</td>
+<td>Uses <code>hash(lower(product_brand))</code></td>
+</tr>
+<tr>
+<td><code>dim_product_category</code></td>
+<td>Distinct product categories</td>
+<td>-</td>
+<td>Uses <code>hash(lower(product_category))</code></td>
+</tr>
+<tr>
+<td><code>dim_customer</code></td>
+<td>Cleaned customer details</td>
+<td>-</td>
+<td>Resolves gender conflicts and deduplicates using temporary views</td>
+</tr>
+<tr>
+<td><code>dim_customer_segment</code></td>
+<td>Customer segment history tracking</td>
+<td>SCD Type 2</td>
+<td>Tracks historical changes in customer segments</td>
+</tr>
+<tr>
+<td><code>dim_product</code></td>
+<td>Product info with price versioning</td>
+<td>SCD Type 2</td>
+<td>Tracks changes in product price, brand, category</td>
+</tr>
+<tr>
+<td><code>dim_feedback</code></td>
+<td>Feedback/rating history</td>
+<td>SCD Type 2</td>
+<td>Tracks customer feedback/rating changes over time</td>
+</tr>
+<tr>
+<td><code>dim_shipping</code></td>
+<td>Shipping method reference</td>
+<td>-</td>
+<td>Extracts distinct shipping methods with hash keys</td>
+</tr>
+<tr>
+<td><code>fact_orders_details</code></td>
+<td>Central fact table for orders</td>
+<td>-</td>
+<td>Combines all dimension keys and measures into one detailed fact table</td>
+</tr>
+</tbody>
+</table>
+
+</body>
+</html>

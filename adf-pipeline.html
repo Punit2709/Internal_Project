@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADF Pipeline Documentation</title>
+    <style>
+        @media print {
+            @page {
+                margin: 1in;
+                size: A4;
+            }
+            
+            body {
+                margin: 0;
+                padding: 0;
+            }
+            
+            .page-break {
+                page-break-before: always;
+            }
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 40px;
+            background: white;
+        }
+        
+        .header-title {
+            text-align: center;
+            font-size: 28px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 40px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 15px;
+        }
+        
+        h1 {
+            font-size: 22px;
+            font-weight: bold;
+            margin-top: 35px;
+            margin-bottom: 20px;
+            color: #2c3e50;
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+        }
+        
+        h2 {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            color: #34495e;
+        }
+        
+        h3 {
+            font-size: 16px;
+            font-weight: bold;
+            margin-top: 20px;
+            margin-bottom: 12px;
+            color: #2c3e50;
+        }
+        
+        h4 {
+            font-size: 14px;
+            font-weight: bold;
+            margin-top: 18px;
+            margin-bottom: 10px;
+            color: #34495e;
+        }
+        
+        p {
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+        
+        ul, ol {
+            margin-bottom: 15px;
+            padding-left: 25px;
+        }
+        
+        li {
+            margin-bottom: 6px;
+        }
+        
+        img {
+            max-width: 100%;
+            height: auto;
+            margin: 15px 0;
+            display: block;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        
+        th, td {
+            padding: 10px 12px;
+            text-align: left;
+            border: 1px solid #bdc3c7;
+        }
+        
+        th {
+            font-weight: bold;
+            background: #ecf0f1;
+            color: #2c3e50;
+        }
+        
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .overview-box {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+            border-left: 4px solid #27ae60;
+        }
+        
+        .purpose-box {
+            background: #fef9e7;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+            border-left: 4px solid #f39c12;
+        }
+        
+        .code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 13px;
+        }
+        
+        .bold {
+            font-weight: bold;
+        }
+        
+        .italic {
+            font-style: italic;
+        }
+        
+        .section-divider {
+            height: 1px;
+            background: #bdc3c7;
+            margin: 30px 0;
+        }
+        
+        .step-number {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .screenshot-label {
+            font-weight: bold;
+            color: #34495e;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header-title">🚀 ADF Pipeline Documentation</div>
+    
+    <div class="overview-box">
+        <h2>📌 Overview</h2>
+        <p>This documentation outlines two core pipelines built using <strong>Azure Data Factory (ADF)</strong>:</p>
+        <ol>
+            <li><strong>Run All Pipeline</strong> – Triggers the full data flow process</li>
+            <li><strong>Remote ADLS ➡️ Local ADLS</strong> – Transfers updated files based on metadata</li>
+        </ol>
+    </div>
+
+    <div class="page-break"></div>
+
+    <h1>1️⃣ Run All Pipeline</h1>
+
+    <div class="purpose-box">
+        <h2>🧩 Purpose</h2>
+        <p>The <strong>Run All Pipeline</strong> orchestrates the end-to-end data lifecycle by executing three sub-pipelines sequentially:</p>
+        <ol>
+            <li>🔄 <strong>Data Ingestion</strong></li>
+            <li>🔧 <strong>Transformation</strong></li>
+            <li>📤 <strong>Data Dumping</strong></li>
+        </ol>
+    </div>
+
+    <h2>🛠️ Implementation</h2>
+    <p>This pipeline uses <strong>Execute Pipeline</strong> activities to manage dependencies and execution flow.</p>
+    
+    <div class="screenshot-label">📸 Screenshots:</div>
+    <img src="images/adf/run_all_1.png" alt="Run All Pipeline Screenshot 1" />
+    <img src="images/adf/run_all_2.png" alt="Run All Pipeline Screenshot 2" />
+    <img src="images/adf/run_all_3.png" alt="Run All Pipeline Screenshot 3" />
+    <img src="images/adf/run_all_4.png" alt="Run All Pipeline Screenshot 4" />
+
+    <div class="section-divider"></div>
+
+    <h1>2️⃣ Remote ADLS ➡️ Local ADLS Pipeline</h1>
+
+    <div class="purpose-box">
+        <h2>🧩 Purpose</h2>
+        <p>This pipeline copies only the <strong>new or modified files</strong> from a <strong>Remote ADLS</strong> container to a <strong>Local ADLS</strong> container using metadata-based filtering.</p>
+    </div>
+
+    <h2>🧠 Working Logic</h2>
+    <ul>
+        <li>A <strong>pipeline variable</strong> called <span class="code">lastRunTime</span> stores the last execution time.</li>
+        <li><strong>Metadata Activity</strong> is used to list all files along with their <strong>last modified time</strong>.</li>
+        <li>A <strong>ForEach Activity</strong> filters out only files modified after <span class="code">lastRunTime</span>.</li>
+        <li>At the end, <span class="code">lastRunTime</span> is updated to current time using <span class="code">@utcNow()</span>.</li>
+    </ul>
+
+    <h2>🛠️ Implementation Steps</h2>
+
+    <h3><span class="step-number">📍 Step 1:</span> Metadata Activity</h3>
+    <ul>
+        <li><strong>Source</strong>: Remote ADLS</li>
+        <li><strong>Sink</strong>: Local ADLS</li>
+    </ul>
+    <p>Extracted Metadata Fields:</p>
+    <ul>
+        <li>🧾 <span class="code">childItems</span> – Lists all files</li>
+        <li>🕒 <span class="code">lastModified</span> – Used to filter new/updated files</li>
+    </ul>
+    
+    <div class="screenshot-label">📸 Screenshots:</div>
+    <img src="images/adf/ing_0.png" alt="Metadata Overview" />
+    <img src="images/adf/ing_1.png" alt="Metadata Config 1" />
+    <img src="images/adf/ing_2.png" alt="Metadata Config 2" />
+    <img src="images/adf/ing_3.png" alt="Metadata Config 3" />
+
+    <h3><span class="step-number">🔁 Step 2:</span> ForEach Activity</h3>
+    <p>Filters files based on:</p>
+    <ul>
+        <li><span class="code">lastRunTime</span></li>
+        <li><span class="code">@utcNow()</span></li>
+    </ul>
+    <p>Only files modified after <span class="code">lastRunTime</span> are processed.</p>
+    
+    <div class="screenshot-label">📸 Screenshots:</div>
+    <img src="images/adf/ing_4.png" alt="ForEach 1" />
+    <img src="images/adf/ing_5.png" alt="ForEach 2" />
+    <img src="images/adf/ing_6.png" alt="ForEach 3" />
+    <img src="images/adf/ing_7.png" alt="ForEach 4" />
+    <img src="images/adf/ing_8.png" alt="ForEach 5" />
+    <img src="images/adf/ing_9.png" alt="ForEach 6" />
+
+    <h3><span class="step-number">🧮 Step 3:</span> Set Variable Activity</h3>
+    <ul>
+        <li>Updates the <span class="code">lastRunTime</span> with current time</li>
+        <li>Expression used: <span class="code">@utcNow()</span></li>
+    </ul>
+    
+    <div class="screenshot-label">📸 Screenshot:</div>
+    <img src="images/adf/ing_10.png" alt="Set Variable" />
+
+    <div class="page-break"></div>
+
+    <h1>3️⃣ Data Transformation Pipeline</h1>
+
+    <div class="purpose-box">
+        <h2>🧩 Purpose</h2>
+        <p>This pipeline focuses on executing <strong>Databricks Notebooks</strong> to perform data transformation across the <strong>Bronze, Silver, and Gold layers</strong>.</p>
+    </div>
+
+    <h2>⚙️ Pipeline Flow & Notebook Activities</h2>
+    <p>This pipeline includes <strong>4 key notebook activities</strong> executed in sequence:</p>
+
+    <ol>
+        <li>
+            <strong>🛠 Preprocessing Notebook</strong>
+            <ul>
+                <li>Sets up <strong>ADLS-Databricks connection</strong></li>
+                <li>Mounts necessary storage locations</li>
+            </ul>
+            <p class="italic">📍 Prepares the workspace for downstream tasks</p>
+        </li>
+
+        <li>
+            <strong>🥉 Bronze Layer Notebook</strong>
+            <ul>
+                <li>Uses <strong>Autoloader</strong> to ingest raw data</li>
+                <li>Creates the <span class="code">bronze_layer</span> table</li>
+            </ul>
+            <p class="italic">📍 First layer of structured storage</p>
+        </li>
+
+        <li>
+            <strong>🥈 Silver Layer Notebook</strong>
+            <ul>
+                <li>Transforms raw data into <strong>normalized, deduplicated</strong> dimension and fact tables</li>
+            </ul>
+            <p class="italic">📍 Refined and business-readable data</p>
+        </li>
+
+        <li>
+            <strong>🥇 Gold Layer Notebook</strong>
+            <ul>
+                <li>Calculates business <strong>KPIs</strong>, aggregations, and reporting outputs</li>
+            </ul>
+            <p class="italic">📍 Final layer used for analytics and reporting</p>
+        </li>
+    </ol>
+
+    <h2>🖼️ Implementation Screenshots</h2>
+    
+    <img src="images/adf/ing_11.png" alt="📋 Pipeline Overview" />
+    <img src="images/adf/dbx_1.png" alt="🧱 Notebook Start" />
+
+    <h3>🔧 Preprocessing & Bronze Layer</h3>
+    <img src="images/adf/dbx_2.png" alt="Mounting & Setup" />
+    <img src="images/adf/dbx_3.png" alt="Bronze Step 1" />
+    <img src="images/adf/dbx_4.png" alt="Bronze Step 2" />
+    <img src="images/adf/dbx_5.png" alt="Bronze Step 3" />
+    <img src="images/adf/dbx_6.png" alt="Bronze Step 4" />
+    <img src="images/adf/dbx_7.png" alt="Bronze Step 5" />
+
+    <h3>⚙️ Silver Layer</h3>
+    <img src="images/adf/dbx_8.png" alt="Silver Step 1" />
+    <img src="images/adf/dbx_9.png" alt="Silver Step 2" />
+    <img src="images/adf/dbx_10.png" alt="Silver Step 3" />
+
+    <h3>📊 Gold Layer</h3>
+    <img src="images/adf/dbx_11.png" alt="Gold Step 1" />
+    <img src="images/adf/dbx_12.png" alt="Gold Step 2" />
+    <img src="images/adf/dbx_13.png" alt="Gold Step 3" />
+
+    <h2>🔗 Databricks Link Service</h2>
+    <p>This section defines the connection between <strong>Azure Data Factory</strong> and <strong>Databricks</strong>.</p>
+    <ul>
+        <li>Configures <strong>Databricks Workspace URL</strong></li>
+        <li>Specifies <strong>Cluster ID</strong> to be used</li>
+        <li>Authenticated using a <strong>Databricks Access Token</strong></li>
+    </ul>
+    
+    <div class="screenshot-label">📸 Screenshot:</div>
+    <img src="images/adf/dbx_14.png" alt="Databricks Link Service" />
+
+    <div class="page-break"></div>
+
+    <h1>4️⃣ Data Dumping Pipeline</h1>
+
+    <div class="purpose-box">
+        <h2>🧩 Purpose</h2>
+        <p>This pipeline is responsible for transferring <strong>KPI output data</strong> (stored as Parquet files in a Databricks external location) to <strong>Snowflake tables</strong>.</p>
+        
+        <p>It ensures:</p>
+        <ul>
+            <li>Only the <strong>latest version</strong> of each KPI table is picked</li>
+            <li>Tables are dynamically created in Snowflake</li>
+            <li>Data is efficiently loaded using a <strong>staging area</strong></li>
+        </ul>
+    </div>
+
+    <h2>⚙️ Pipeline Flow</h2>
+    <p>This pipeline includes the following core activities:</p>
+    <ol>
+        <li><strong>📁 Metadata Activity</strong> – Retrieves folders (each representing a KPI table)</li>
+        <li><strong>🔁 ForEach Activity</strong> – Iterates through each KPI folder, identifies the <strong>latest parquet file</strong>, triggers <strong>dynamic Snowflake table creation</strong> and <strong>data load</strong></li>
+    </ol>
+
+    <h2>🖼️ Implementation Screenshots</h2>
+
+    <h3>🧾 Pipeline Overview</h3>
+    <img src="images/adf/dd_1.png" alt="Pipeline Overview" />
+
+    <h3>📂 Metadata Activity – Folder Level</h3>
+    <ul>
+        <li>Scans the directory that holds <strong>one folder per KPI</strong></li>
+        <li>Retrieves structure to iterate further</li>
+    </ul>
+    <img src="images/adf/dd_2.png" alt="Metadata 1" />
+    <img src="images/adf/dd_3.png" alt="Metadata 2" />
+    <img src="images/adf/dd_4.png" alt="Metadata 3" />
+
+    <h3>🔁 ForEach Activity</h3>
+    <ul>
+        <li>Loops through each folder (KPI table)</li>
+        <li>Kicks off a sub-pipeline per folder</li>
+    </ul>
+    <img src="images/adf/dd_5.png" alt="ForEach 1" />
+    <img src="images/adf/dd_6.png" alt="ForEach 2" />
+    <img src="images/adf/dd_7.png" alt="ForEach 3" />
+
+    <h3>📌 Set Variable – Folder Name</h3>
+    <p>Stores the current KPI folder name (used in next steps)</p>
+    <img src="images/adf/dd_8.png" alt="Set Folder Name" />
+
+    <h3>📂 Get Metadata – File Level</h3>
+    <ul>
+        <li>Retrieves the list of Parquet files within a KPI folder</li>
+        <li>Extracts file names and last modified timestamps</li>
+    </ul>
+    <img src="images/adf/dd_9.png" alt="File Metadata" />
+
+    <h3>🔍 Filter Activity – Latest File</h3>
+    <p>Filters files to select only the <strong>most recent Parquet file</strong></p>
+    <img src="images/adf/dd_10.png" alt="Filter Latest File" />
+
+    <h3>📝 Set Variable – Filename</h3>
+    <p>Captures the name of the filtered latest file</p>
+    <img src="images/adf/dd_11.png" alt="Set Filename" />
+
+    <h3>🧹 Delete Activity – Clean Stage Area</h3>
+    <ul>
+        <li>Clears the <strong>Snowflake stage area</strong> (ADLS Gen1) before loading</li>
+        <li>Ensures no conflict with previous data</li>
+    </ul>
+    <img src="images/adf/dd_12.png" alt="Delete Stage 1" />
+    <img src="images/adf/dd_13.png" alt="Delete Stage 2" />
+    <img src="images/adf/dd_14.png" alt="Delete Stage 3" />
+
+    <h3>📄 Lookup & Script Activity – Snowflake Table Creation</h3>
+    <ul>
+        <li>Uses <strong>Lookup</strong> to fetch schema dynamically</li>
+        <li><strong>Script Activity</strong> creates table in Snowflake before data load</li>
+    </ul>
+    <img src="images/adf/dd_15.png" alt="Lookup" />
+    <img src="images/adf/dd_16.png" alt="Script 1" />
+    <img src="images/adf/dd_17.png" alt="Script 2" />
+
+    <h3>📥 Copy Into Activity – Load to Snowflake</h3>
+    <ul>
+        <li>Performs the <strong>actual data copy</strong> from ADLS to Snowflake</li>
+        <li>Utilizes an <strong>intermediate stage (ADLS Gen1)</strong> for Snowflake compatibility</li>
+    </ul>
+    <img src="images/adf/dd_18.png" alt="Copy Data 1" />
+    <img src="images/adf/dd_19.png" alt="Copy Data 2" />
+
+    <h2>✅ Summary</h2>
+    <table>
+        <tr>
+            <th>Component</th>
+            <th>Purpose</th>
+        </tr>
+        <tr>
+            <td>Metadata Activity</td>
+            <td>Retrieves KPI folders and file details</td>
+        </tr>
+        <tr>
+            <td>ForEach Activity</td>
+            <td>Iterates through KPI folders</td>
+        </tr>
+        <tr>
+            <td>Set Variable</td>
+            <td>Tracks folder and latest file name</td>
+        </tr>
+        <tr>
+            <td>Filter Activity</td>
+            <td>Picks latest Parquet file</td>
+        </tr>
+        <tr>
+            <td>Delete Activity</td>
+            <td>Cleans Snowflake stage area</td>
+        </tr>
+        <tr>
+            <td>Script Activity</td>
+            <td>Dynamically creates Snowflake tables</td>
+        </tr>
+        <tr>
+            <td>Copy Data Activity</td>
+            <td>Loads data using staging via ADLS Gen1</td>
+        </tr>
+    </table>
+</body>
+</html>

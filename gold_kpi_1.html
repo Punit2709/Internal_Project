@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gold Layer Documentation</title>
+    <style>
+        @page {
+            margin: 1in;
+            size: A4;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 20px 40px 20px 60px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            font-size: 2.2em;
+            margin-top: 0;
+        }
+        
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 8px;
+            font-size: 1.6em;
+            margin-top: 2em;
+            page-break-after: avoid;
+        }
+        
+        h3 {
+            color: #2c3e50;
+            font-size: 1.3em;
+            margin-top: 1.5em;
+            page-break-after: avoid;
+        }
+        
+        code {
+            background-color: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            line-height: 1.4;
+            page-break-inside: avoid;
+            margin: 1em 0;
+        }
+        
+        pre code {
+            background: none;
+            padding: 0;
+        }
+        
+        ul, ol {
+            padding-left: 20px;
+        }
+        
+        li {
+            margin-bottom: 5px;
+        }
+        
+        .emoji {
+            font-size: 1.2em;
+        }
+        
+        .no-break {
+            page-break-inside: avoid;
+        }
+        
+        hr {
+            border: none;
+            border-top: 1px solid #eee;
+            margin: 2em 0;
+        }
+        
+        @media print {
+            body {
+                font-size: 11pt;
+                line-height: 1.4;
+                padding: 0.5in 0.5in 0.5in 0.8in;
+            }
+            
+            h1 {
+                font-size: 18pt;
+            }
+            
+            h2 {
+                font-size: 14pt;
+            }
+            
+            h3 {
+                font-size: 12pt;
+            }
+            
+            pre {
+                font-size: 9pt;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<h1><span class="emoji">🏆</span> Gold Layer Documentation</h1>
+
+<p>This document outlines the creation of <strong>Gold Layer</strong> KPI tables from Silver Layer dimension and fact tables for business analytics.</p>
+
+<hr>
+
+<h2><span class="emoji">⚙️</span> Overview</h2>
+
+<ul>
+<li><strong>Source</strong>: <code>punit_dbx.silver</code> tables</li>
+<li><strong>Target Schema</strong>: <code>punit_dbx.gold</code></li>
+<li><strong>Purpose</strong>: Create business KPIs and analytics from clean dimensional data</li>
+</ul>
+
+<hr>
+
+<h2><span class="emoji">📊</span> KPI Tables</h2>
+
+<div class="no-break">
+<h3>1. Customer Return Rate</h3>
+
+<p><strong>Purpose:</strong> Measure customer retention and churn rates</p>
+
+<h4>Annual Customer Retention Rate</h4>
+
+<pre><code>-- Temporary view for repeated customers
+CREATE OR REPLACE TEMPORARY VIEW repeated_cust AS (
+  WITH cte AS (
+    SELECT DISTINCT customer_id, dd.year
+    FROM punit_dbx.silver.fact_orders_details fos
+    JOIN punit_dbx.silver.dim_date dd ON fos.date_id = dd.date_id
+  ),
+  cte2 AS (
+    SELECT *,
+      LAG(year) OVER(PARTITION BY customer_id ORDER BY year) AS lag_year
+    FROM cte
+  )
+  SELECT * FROM cte2 WHERE year = lag_year + 1
+);
+
+-- All customers by year
+CREATE OR REPLACE TEMPORARY VIEW all_cust AS (
+  SELECT DISTINCT customer_id, dd.year
+  FROM punit_dbx.silver.fact_orders_details fos
+  JOIN punit_dbx.silver.dim_date dd ON fos.date_id = dd.date_id
+);
+
+-- Final retention rate table
+CREATE OR REPLACE TABLE punit_dbx.gold.cust_return_rate AS (
+  WITH cte_cnt_repeated AS (
+    SELECT year, COUNT(*) AS repeated_cnt
+    FROM repeated_cust
+    GROUP BY year
+  ),
+  cte_cnt_all AS (
+    SELECT year, COUNT(*) AS all_cnt
+    FROM all_cust
+    GROUP BY year
+  )
+  SELECT cca.year,
+    ROUND((100 * ccr.repeated_cnt) / cca.all_cnt, 2) AS repeated_percentage
+  FROM cte_cnt_repeated ccr
+  RIGHT JOIN cte_cnt_all cca ON ccr.year = cca.year
+  ORDER BY year
+);</code></pre>
+
+  <div class="result-section">
+    <strong>🖼️ Result:</strong>
+    <p>
+      <img src="images/1_a.png" alt="Yearly Return Rate" width="600" /><br><br>
+    </p>
+  </div>
+
+<h4>Monthly Churn Rate</h4>
+
+<pre><code>
+CREATE OR REPLACE TEMPORARY VIEW repeated_cust AS (
+  WITH cte AS (
+    SELECT DISTINCT
+      customer_id,
+      dd.year,
+      dd.month
+    FROM punit_dbx.silver.fact_orders_details AS fos
+    JOIN punit_dbx.silver.dim_date AS dd
+      ON fos.date_id = dd.date_id
+  ),
+  cte2 AS (
+    SELECT *,
+      LAG(year) OVER (PARTITION BY customer_id ORDER BY year, month) AS lag_year,
+      LAG(month) OVER (PARTITION BY customer_id ORDER BY year, month) AS lag_month
+    FROM cte
+  )
+  SELECT * FROM cte2
+  WHERE 
+    (year = lag_year AND month = lag_month + 1) OR
+    (year = lag_year + 1 AND lag_month = 12 AND month = 1)
+);
+
+-- Create temporary view for all unique customers per month
+CREATE OR REPLACE TEMPORARY VIEW all_cust AS (
+  WITH cte AS (
+    SELECT DISTINCT
+      customer_id,
+      dd.year,
+      dd.month
+    FROM punit_dbx.silver.fact_orders_details AS fos
+    JOIN punit_dbx.silver.dim_date AS dd
+      ON fos.date_id = dd.date_id
+  )
+  SELECT * FROM cte
+);
+</code></pre>
+
+<pre><code>
+-- Create final table calculating monthly churn rate
+CREATE OR REPLACE TABLE punit_dbx.gold.monthly_churn_rate AS (
+  WITH cte_cnt_repeated AS (
+    SELECT 
+      year, 
+      month,
+      COUNT(*) AS repeated_cnt 
+    FROM repeated_cust
+    GROUP BY year, month
+  ),
+  cte_cnt_all AS (
+    SELECT 
+      year, 
+      month,
+      COUNT(*) AS all_cnt
+    FROM all_cust
+    GROUP BY year, month
+  ),
+  result_cte AS (
+    SELECT 
+      cca.year,
+      cca.month,
+      ROUND((100 * COALESCE(ccr.repeated_cnt, 0)) / cca.all_cnt, 2) AS repeated_percentage
+    FROM cte_cnt_all AS cca
+    LEFT JOIN cte_cnt_repeated AS ccr
+      ON cca.year = ccr.year AND cca.month = ccr.month
+  )
+  SELECT 
+    year,
+    month,
+    repeated_percentage,
+    ROUND((100 - repeated_percentage), 2) AS not_repeated
+  FROM result_cte
+  ORDER BY year, month
+);
+</code></pre>
+  <div class="result-section">
+    <strong>🖼️ Result:</strong>
+    <p>
+      <img src="images/1_b.png" alt="Monthly Churn Rate" width="600" /><br><br>
+    </p>
+  </div>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>2. Product Return Rate by Brand</h3>
+
+<p><strong>Purpose:</strong> Analyze product return patterns by brand</p>
+
+<pre><code>-- Create final table for product brand-wise order return rate
+CREATE OR REPLACE TABLE punit_dbx.gold.order_return_rate AS (
+  WITH cte AS (
+    SELECT 
+      product_brand_id,
+      SUM(CASE 
+            WHEN LOWER(ods.order_status) IN ('cancelled', 'returned') THEN 1 
+            ELSE 0 
+          END) AS return_cnt,
+      SUM(CASE 
+            WHEN LOWER(ods.order_status) = 'order' THEN 1 
+            ELSE 0 
+          END) AS final_sts_cnt
+    FROM punit_dbx.silver.fact_orders_details AS fos
+    JOIN dim_order_status AS ods 
+      ON fos.order_status_id = ods.order_status_id
+    GROUP BY product_brand_id
+  )
+  SELECT 
+    dpb.product_brand,
+    ROUND((return_cnt * 100.0 / final_sts_cnt), 2) AS return_rate
+  FROM cte
+  JOIN punit_dbx.silver.dim_product_brand AS dpb
+    ON cte.product_brand_id = dpb.product_brand_id
+);
+
+);</code></pre>
+
+  <div class="result-section">
+    <strong>🖼️ Result:</strong>
+    <p>
+      <img src="images/2.png" alt="Product Return Rate by Brand" width="600" /><br><br>
+    </p>
+  </div>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>3. Average Product Rating by Category</h3>
+
+<p><strong>Purpose:</strong> Monitor product quality by category</p>
+
+<pre><code>-- Create table to calculate average product rating by category
+CREATE OR REPLACE TABLE punit_dbx.gold.avg_rating_prod_category AS (
+  WITH cte AS (
+    SELECT DISTINCT
+      fos.transaction_id,
+      fos.product_category_id,
+      fos.product_id,
+      CASE 
+        WHEN fd.rating IS NULL THEN 0 
+        ELSE fd.rating 
+      END AS rating
+    FROM punit_dbx.silver.fact_orders_details AS fos
+    JOIN punit_dbx.silver.dim_feedback AS fd 
+      ON fos.feedback_id = fd.feedback_id
+  ),
+  cte2 AS (
+    SELECT 
+      product_category_id,
+      ROUND(AVG(rating), 3) AS avg_rate
+    FROM cte
+    GROUP BY product_category_id
+  )
+  SELECT 
+    dpc.product_category,
+    avg_rate
+  FROM cte2
+  JOIN punit_dbx.silver.dim_product_category AS dpc
+    ON cte2.product_category_id = dpc.product_category_id
+);
+
+);</code></pre>
+
+  <div class="result-section">
+    <strong>🖼️ Result:</strong>
+    <p>
+      <img src="images/3.png" alt="Average Product Rating by Category" width="600" /><br><br>
+    </p>
+  </div>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>4. Payment Method Preference</h3>
+
+<p><strong>Purpose:</strong> Analyze payment method usage patterns</p>
+
+<pre><code>-- Create table to calculate frequency percentage of payment methods
+CREATE OR REPLACE TABLE punit_dbx.gold.pay_method_freq AS (
+  WITH cte AS (
+    SELECT DISTINCT
+      fos.transaction_id,
+      fos.payment_method_id
+    FROM punit_dbx.silver.fact_orders_details AS fos
+  ),
+  cte2 AS (
+    SELECT 
+      payment_method_id,
+      COUNT(*) AS cnt
+    FROM cte
+    GROUP BY payment_method_id
+  ),
+  cte3 AS (
+    SELECT 
+      COUNT(DISTINCT transaction_id) AS cnt 
+    FROM punit_dbx.silver.fact_orders_details
+  )
+  SELECT 
+    cte2.payment_method_id,
+    dpm.payment_method,
+    ROUND(cte2.cnt * 100.0 / (SELECT cnt FROM cte3), 2) AS avg_rate
+  FROM cte2
+  JOIN punit_dbx.silver.dim_payment_method AS dpm 
+    ON cte2.payment_method_id = dpm.payment_method_id
+);
+</code></pre>
+
+  <div class="result-section">
+    <strong>🖼️ Result:</strong>
+    <p>
+      <img src="images/4.png" alt="Payment Method Preference" width="600" /><br><br>
+    </p>
+  </div>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>5. Peak Purchase Activity</h3>
+
+<p><strong>Purpose:</strong> Identify high-activity time periods</p>
+
+<pre><code>-- Create table to store the day with the highest number of products purchased
+CREATE OR REPLACE TABLE punit_dbx.gold.most_product_purchase AS (
+  WITH cte AS (
+    SELECT 
+      DATE(fos.datetimestamp) AS date_,
+      SUM(
+        CASE 
+          WHEN quantity IS NULL THEN 1 
+          ELSE FLOOR(quantity) 
+        END
+      ) AS total_product
+    FROM punit_dbx.silver.fact_orders_details AS fos
+    JOIN punit_dbx.silver.dim_order_status AS dos
+      ON fos.order_status_id = dos.order_status_id
+     AND LOWER(dos.order_status) = 'order'
+    GROUP BY DATE(fos.datetimestamp)
+    ORDER BY total_product DESC
+    LIMIT 1
+  )
+  SELECT 
+    DAY(date_) AS day_num,
+    DATE_FORMAT(date_, 'EEEE') AS day_name,
+    MONTH(date_) AS month,
+    YEAR(date_) AS year,
+    total_product
+  FROM cte
+);
+
+);</code></pre>
+
+  <div class="result-section">
+    <strong>🖼️ Result:</strong>
+    <p>
+      <img src="images/5.png" alt="Peak Purchase Activity" width="600" /><br><br>
+    </p>
+  </div>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>6. Average Delivery Time by Shipping Method</h3>
+
+<p><strong>Purpose:</strong> Monitor shipping performance</p>
+
+<pre><code>-- Create table to calculate average shipping time per method by month
+CREATE OR REPLACE TABLE punit_dbx.gold.avg_ship_time AS (
+  WITH order_cte AS (
+    SELECT 
+      transaction_id, 
+      customer_id, 
+      shipping_method_id,
+      CASE 
+        WHEN LOWER(dos.order_status) = 'order' THEN datetimestamp 
+        ELSE NULL 
+      END AS order_time
+    FROM punit_dbx.silver.fact_orders_details AS fos
+    INNER JOIN punit_dbx.silver.dim_order_status AS dos
+      ON fos.order_status_id = dos.order_status_id
+  ),
+
+  deliver_cte AS (
+    SELECT 
+      transaction_id, 
+      customer_id, 
+      shipping_method_id,
+      CASE 
+        WHEN LOWER(dos.order_status) = 'delivered' THEN datetimestamp 
+        ELSE NULL 
+      END AS deliver_time
+    FROM punit_dbx.silver.fact_orders_details AS fos
+    INNER JOIN punit_dbx.silver.dim_order_status AS dos
+      ON fos.order_status_id = dos.order_status_id
+  ),
+
+  cte3 AS (
+    SELECT 
+      oc.*, 
+      DATEDIFF(dc.deliver_time, oc.order_time) AS date_dif
+    FROM order_cte AS oc
+    JOIN deliver_cte AS dc
+      ON oc.transaction_id = dc.transaction_id
+    WHERE oc.order_time IS NOT NULL AND dc.deliver_time IS NOT NULL
+    ORDER BY oc.order_time
+  ),
+
+  cte4 AS (
+    SELECT 
+      MONTH(order_time) AS month_num,
+      DATE_FORMAT(order_time, 'MMMM') AS month,
+      YEAR(order_time) AS year,
+      shipping_method_id,
+      ROUND(AVG(date_dif), 2) AS avg_days  -- average delivery duration
+    FROM cte3
+    GROUP BY 
+      MONTH(order_time),
+      DATE_FORMAT(order_time, 'MMMM'),
+      YEAR(order_time),
+      shipping_method_id
+    ORDER BY year, month_num
+  )
+
+  SELECT 
+    a.month,
+    a.year,
+    ds.shipping_method,
+    a.avg_days
+  FROM cte4 AS a
+  JOIN punit_dbx.silver.dim_shipping AS ds 
+    ON a.shipping_method_id = ds.shipping_method_id
+  ORDER BY year, month_num, avg_days
+);
+</code></pre>
+
+  <div class="result-section">
+    <strong>🖼️ Result:</strong>
+    <p>
+      <img src="images/6.png" alt="Average Delivery Time by Shipping Method" width="600" /><br><br>
+    </p>
+  </div>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>7. Revenue Risk Assessment</h3>
+
+<p><strong>Purpose:</strong> Calculate revenue at risk from returns</p>
+
+<pre><code>-- Create table to identify customers with repeated purchases of the same product
+CREATE OR REPLACE TABLE punit_dbx.gold.repeated_purchase_cust AS (
+  WITH cte AS (
+    SELECT DISTINCT
+      product_id, 
+      customer_id,
+      transaction_id
+    FROM punit_dbx.silver.fact_orders_details
+  ),
+
+  cte2 AS (
+    SELECT 
+      customer_id, 
+      product_id,
+      COUNT(*) AS orders 
+    FROM cte 
+    GROUP BY product_id, customer_id
+    HAVING COUNT(*) > 1
+  )
+
+  SELECT DISTINCT
+    cte2.customer_id,
+    dp.product_name, 
+    cte2.orders  
+  FROM cte2
+  JOIN punit_dbx.silver.dim_product AS dp
+    ON cte2.product_id = dp.product_id
+);
+
+);</code></pre>
+
+  <div class="result-section">
+    <strong>🖼️ Result:</strong>
+    <p>
+      <img src="images/7_a.png" alt="Revenue Risk Assessment" width="600" /><br><br>
+      <img src="images/7_b.png" alt="Revenue Risk Assessment" width="600" />
+    </p>
+  </div>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>8. Demographics Revenue Analysis</h3>
+
+<p><strong>Purpose:</strong> Revenue contribution by product types across genders and age groups</p>
+
+<pre><code>-- Create fact view
+-- Create table to calculate revenue lost due to returns by state and country
+CREATE OR REPLACE TABLE punit_dbx.gold.risk_revanue_rate AS (
+  WITH cte AS (
+    SELECT 
+      fos.*,
+      dp.amount,
+      CASE 
+        WHEN fos.quantity IS NOT NULL THEN FLOOR(fos.quantity) 
+        ELSE 1 
+      END AS quantity_,
+      dos.order_status 
+    FROM punit_dbx.silver.fact_orders_details AS fos
+    JOIN punit_dbx.silver.dim_product AS dp
+      ON fos.product_id = dp.product_id
+    JOIN punit_dbx.silver.dim_order_status AS dos
+      ON fos.order_status_id = dos.order_status_id
+     AND LOWER(dos.order_status) IN ('returned', 'delivered')
+  ),
+
+  cte2 AS (
+    SELECT 
+      dl.state_id,
+      dl.country_id,
+      SUM(
+        CASE 
+          WHEN LOWER(c.order_status) = 'delivered' THEN amount * quantity_ 
+          ELSE 0 
+        END
+      ) AS total_price,
+      SUM(
+        CASE 
+          WHEN LOWER(c.order_status) = 'returned' THEN amount * quantity_ 
+          ELSE 0 
+        END
+      ) AS return_price 
+    FROM cte AS c
+    JOIN punit_dbx.silver.dim_location AS dl
+      ON dl.location_id = c.location_id
+    GROUP BY dl.state_id, dl.country_id
+  )
+
+  SELECT 
+    ds.state,
+    dc.country,
+    total_price AS total_revenue,
+    return_price AS revenue_lost,
+    ROUND((100 * return_price) / (total_price + return_price), 2) AS revenue_risk_percentage 
+  FROM cte2 AS c
+  JOIN punit_dbx.silver.dim_country AS dc
+    ON dc.country_id = c.country_id
+  JOIN punit_dbx.silver.dim_state AS ds
+    ON ds.state_id = c.state_id
+);
+</code></pre>
+  <div class="result-section">
+    <strong>🖼️ Result:</strong>
+    <p>
+      <img src="images/8.png" alt="Brand Loyalty Score A" width="600" /><br><br>
+    </p>
+  </div>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>9. Purchase Frequency by Timeslot</h3>
+
+<p><strong>Purpose:</strong> Frequency of product purchases in 6-hour slots to understand peak shopping hours</p>
+
+<pre><code>-- Create table showing product purchase frequency by time slot of the day
+CREATE OR REPLACE TABLE punit_dbx.gold.mst_prdct_prchs_freq_timeslot AS (
+  WITH cte AS (
+    SELECT DISTINCT
+      transaction_id,
+      product_id,
+      CASE 
+        WHEN HOUR(datetimestamp) BETWEEN 0 AND 6  THEN '12 AM - 6 AM'
+        WHEN HOUR(datetimestamp) BETWEEN 6 AND 12 THEN '6 AM - 12 PM'
+        WHEN HOUR(datetimestamp) BETWEEN 12 AND 18 THEN '12 PM - 6 PM'
+        WHEN HOUR(datetimestamp) BETWEEN 18 AND 23 THEN '6 PM - 12 AM'
+        ELSE NULL
+      END AS timeslot
+    FROM punit_dbx.silver.fact_orders_details
+    WHERE datetimestamp IS NOT NULL
+  )
+
+  SELECT 
+    timeslot AS TimeSlot,
+    COUNT(*) AS Frequency 
+  FROM cte
+  GROUP BY timeslot
+);
+
+);</code></pre>
+
+  <div class="result-section">
+    <strong>🖼️ Result:</strong>
+    <p>
+      <img src="images/9.png" alt="Brand Loyalty Score A" width="600" /><br><br>
+    </p>
+  </div>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>10. Product Loyalty Score</h3>
+
+<p><strong>Purpose:</strong> Products with high loyalty where customers buy the same product multiple times</p>
+
+<pre><code>-- Create temporary view combining transaction, customer, product and age group details
+CREATE OR REPLACE TEMPORARY VIEW fact_vw AS (
+  SELECT 
+    a.transaction_id,
+    a.product_id,
+    a.datetimestamp,
+    a.birth_date,
+    b.order_status,
+    dc.customer_id,
+    dc.gender,
+    dp.product_name,
+    dp.amount,
+    
+    CASE 
+      WHEN a.quantity IS NOT NULL THEN FLOOR(a.quantity)
+      ELSE 1 
+    END AS quantity_,
+
+    CASE 
+      WHEN FLOOR(DATEDIFF(CURRENT_DATE(), TO_DATE(a.birth_date, 'dd/MM/yyyy')) / 365) BETWEEN 0 AND 12 THEN '0 - 12'
+      WHEN FLOOR(DATEDIFF(CURRENT_DATE(), TO_DATE(a.birth_date, 'dd/MM/yyyy')) / 365) BETWEEN 13 AND 20 THEN '13 - 20'
+      WHEN FLOOR(DATEDIFF(CURRENT_DATE(), TO_DATE(a.birth_date, 'dd/MM/yyyy')) / 365) BETWEEN 21 AND 35 THEN '21 - 35'
+      WHEN FLOOR(DATEDIFF(CURRENT_DATE(), TO_DATE(a.birth_date, 'dd/MM/yyyy')) / 365) BETWEEN 36 AND 50 THEN '36 - 50'
+      WHEN FLOOR(DATEDIFF(CURRENT_DATE(), TO_DATE(a.birth_date, 'dd/MM/yyyy')) / 365) > 50 THEN '50 and Above'
+      ELSE NULL
+    END AS age_grp
+
+  FROM punit_dbx.silver.fact_orders_details AS a
+  INNER JOIN punit_dbx.silver.dim_order_status AS b
+    ON a.order_status_id = b.order_status_id 
+   AND LOWER(b.order_status) = 'order'
+
+  INNER JOIN punit_dbx.silver.dim_customer AS dc
+    ON a.customer_id = dc.customer_id
+
+  INNER JOIN punit_dbx.silver.dim_product AS dp
+    ON a.product_id = dp.product_id
+   AND a.datetimestamp BETWEEN dp.start_date AND dp.end_date
+);
+</code></pre>
+
+<pre><code>
+-- Creating Gold table: Revenue and Ratings by Age Group (excluding Returns/Cancellations)
+CREATE OR REPLACE TABLE punit_dbx.gold.age_grp_revanue AS (
+
+  -- Step 1: Exclude returned or cancelled products
+  WITH cte AS (
+    SELECT DISTINCT *
+    FROM fact_vw AS t
+    LEFT ANTI JOIN (
+      SELECT DISTINCT transaction_id, product_id
+      FROM punit_dbx.silver.fact_orders_details AS a
+      INNER JOIN punit_dbx.silver.dim_order_status AS b
+        ON a.order_status_id = b.order_status_id
+      WHERE LOWER(b.order_status) IN ('returned', 'cancelled')
+    ) AS r
+    ON t.transaction_id = r.transaction_id
+   AND t.product_id = r.product_id
+  ),
+
+  -- Step 2: Join with feedback and compute total price and rating
+  cte2 AS (
+    SELECT
+      fos.*,
+      (fos.quantity_ * fos.amount) AS t_price,
+      COALESCE(df.rating, 0) AS rating_
+    FROM cte AS fos
+    INNER JOIN punit_dbx.silver.dim_feedback AS df
+      ON df.customer_id = fos.customer_id
+     AND df.product_id = fos.product_id
+     AND fos.datetimestamp BETWEEN df.start_date AND df.end_date
+  )
+
+  -- Step 3: Aggregate revenue and average ratings by product, gender, and age group
+  SELECT 
+    product_name, 
+    gender, 
+    age_grp AS age_group,
+    ROUND(SUM(t_price), 3) AS total_revenue, 
+    ROUND(AVG(rating_), 3) AS avg_ratings
+  FROM cte2
+  GROUP BY product_name, gender, age_grp
+  ORDER BY age_group, total_revenue
+);
+
+</code></pre>
+
+  <div class="result-section">
+    <strong>🖼️ Result:</strong>
+    <p>
+      <img src="images/10_a.png" alt="Brand Loyalty Score A" width="600" /><br><br>
+      <img src="images/10_b.png" alt="Brand Loyalty Score B" width="600" />
+    </p>
+  </div>
+</div>
+
+<hr>
+
+<div class="no-break">
+<h3>11. Brand Loyalty Score</h3>
+
+<p><strong>Purpose:</strong> Evaluate customer loyalty to specific brands through repeat purchases</p>
+
+<pre><code>-- Creating Gold table: Repeat Purchase Score per Product & Brand
+CREATE OR REPLACE TABLE punit_dbx.gold.rept_prchs_score_prdct AS (
+
+  -- Step 1: Count product purchases per customer-brand combo
+  WITH cte AS (
+    SELECT 
+      customer_id,
+      product_id,
+      product_brand_id,
+      COUNT(*) AS buy_count
+    FROM punit_dbx.silver.fact_orders_details
+    GROUP BY customer_id, product_id, product_brand_id
+  ),
+
+  -- Step 2: Filter for repeat purchases (count > 1) and aggregate
+  repeat_cte AS (
+    SELECT 
+      product_id,
+      product_brand_id,
+      SUM(buy_count) AS repeated_count,
+      COUNT(DISTINCT customer_id) AS cust_repeated
+    FROM cte
+    WHERE buy_count > 1
+    GROUP BY product_id, product_brand_id
+  ),
+
+  -- Step 3: Get total purchase count per product-brand combo
+  all_cte AS (
+    SELECT 
+      product_id,
+      product_brand_id,
+      SUM(buy_count) AS all_buy_count
+    FROM cte
+    GROUP BY product_id, product_brand_id
+  ),
+
+  -- Step 4: Join repeated and total counts, compute repeat purchase percentage
+  result_cte AS (
+    SELECT 
+      r.*,
+      ROUND((r.repeated_count * 100.0) / a.all_buy_count, 2) AS Repeat_Purchase_Percentage
+    FROM repeat_cte AS r
+    JOIN all_cte AS a
+      ON r.product_id = a.product_id
+     AND r.product_brand_id = a.product_brand_id
+  )
+
+  -- Step 5: Join with dimension tables for product and brand details
+  SELECT DISTINCT
+    dp.product_name,
+    dpb.product_brand,
+    rc.repeated_count,
+    rc.cust_repeated,
+    rc.Repeat_Purchase_Percentage
+  FROM result_cte AS rc
+  JOIN punit_dbx.silver.dim_product AS dp
+    ON rc.product_id = dp.product_id
+  JOIN punit_dbx.silver.dim_product_brand AS dpb
+    ON rc.product_brand_id = dpb.product_brand_id
+
+);</code></pre>
+
+  <div class="result-section">
+    <strong>🖼️ Result:</strong>
+    <p>
+      <img src="images/11_a.png" alt="Brand Loyalty Score A" width="600" /><br><br>
+      <img src="images/11_b.png" alt="Brand Loyalty Score B" width="600" />
+    </p>
+  </div>
+</div>
+<hr>
+
+<div class="no-break">
+<h3>12.  Brand Loyalty Score</h3>
+
+<p><strong>Purpose:</strong> Evaluates how loyal customers are to specific brands by calculating repeat purchases.</p>
+
+<pre><code>-- 📦 Creating Gold table: Brand Loyalty Score per Customer
+CREATE OR REPLACE TABLE punit_dbx.gold.brnd_loyalty_scr AS (
+  WITH cte AS (
+    SELECT 
+      fos.customer_id, 
+      fos.product_brand_id,
+      COUNT(*) AS Repeated_Purchase_Count,
+      MAX(fos.datetimestamp) AS Last_Purchase_Date,
+      ROUND(
+        AVG(CASE 
+              WHEN df.rating IS NULL THEN 0 
+              ELSE df.rating 
+            END), 
+        2
+      ) AS avg_rate
+    FROM punit_dbx.silver.fact_orders_details AS fos
+    JOIN punit_dbx.silver.dim_order_status AS dos
+      ON fos.order_status_id = dos.order_status_id
+     AND LOWER(dos.order_status) = 'order'
+    JOIN punit_dbx.silver.dim_feedback AS df 
+      ON fos.feedback_id = df.feedback_id
+     AND fos.datetimestamp BETWEEN df.start_date AND df.end_date
+
+    GROUP BY 
+      fos.customer_id, 
+      fos.product_brand_id
+  )
+  SELECT 
+    dpb.product_brand,
+    c.customer_id,
+    c.Repeated_Purchase_Count,
+    c.Last_Purchase_Date,
+    c.avg_rate
+  FROM cte AS c
+  JOIN punit_dbx.silver.dim_product_brand AS dpb
+    ON c.product_brand_id = dpb.product_brand_id
+  WHERE c.Repeated_Purchase_Count > 1 
+);</code></pre>
+
+  <div class="result-section">
+    <strong>🖼️ Result:</strong>
+    <p>
+      <img src="images/12_a.png" alt="Brand Loyalty Score A" width="600" /><br><br>
+      <img src="images/12_b.png" alt="Brand Loyalty Score B" width="600" />
+    </p>
+  </div>
+</div>
+
+</body>
+</html>
